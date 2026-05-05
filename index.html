@@ -2,7 +2,6 @@
 <html>
 <head>
   <title>Doctor Availability Dashboard</title>
-
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,27 +11,43 @@
 
     h1 {
       text-align: center;
+      margin-bottom: 25px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       background: white;
+      font-size: 14px;
     }
 
     th, td {
       border: 1px solid #ddd;
       padding: 10px;
       vertical-align: top;
+      white-space: pre-line;
     }
 
     th {
       background: #2c7be5;
       color: white;
+      text-align: center;
     }
 
     tr:nth-child(even) {
       background: #f2f6ff;
+    }
+
+    .morning {
+      background: #fff9c4;
+    }
+
+    .evening {
+      background: #bbdefb;
+    }
+
+    .night {
+      background: #e0e0e0;
     }
   </style>
 </head>
@@ -44,21 +59,75 @@
 <table id="dashboard"></table>
 
 <script>
-  // 🔴 PASTE YOUR GOOGLE SHEET CSV LINK HERE
   const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxG5LxY8yTO-WQvgxga47qIE_3JQYcuiRyo1wTskMcDRfiSVsKCZ1KPjQoHFmO4uTHbMettWKlyj1_/pub?gid=1707988883&single=true&output=csv";
+
+  function cleanCellText(text) {
+    return text
+      .replaceAll('"', '')
+      .replaceAll("Select all days you are available this week? ", "")
+      .replace(/\bPhone-[0-9+\-\s]+/g, "")
+      .replace(/,\s*$/g, "")
+      .trim();
+  }
+
+  function parseCSV(csv) {
+    const rows = [];
+    let currentRow = [];
+    let currentCell = "";
+    let insideQuotes = false;
+
+    for (let i = 0; i < csv.length; i++) {
+      const char = csv[i];
+      const nextChar = csv[i + 1];
+
+      if (char === '"' && nextChar === '"') {
+        currentCell += '"';
+        i++;
+      } else if (char === '"') {
+        insideQuotes = !insideQuotes;
+      } else if (char === "," && !insideQuotes) {
+        currentRow.push(currentCell);
+        currentCell = "";
+      } else if ((char === "\n" || char === "\r") && !insideQuotes) {
+        if (currentCell || currentRow.length > 0) {
+          currentRow.push(currentCell);
+          rows.push(currentRow);
+          currentRow = [];
+          currentCell = "";
+        }
+      } else {
+        currentCell += char;
+      }
+    }
+
+    if (currentCell || currentRow.length > 0) {
+      currentRow.push(currentCell);
+      rows.push(currentRow);
+    }
+
+    return rows;
+  }
 
   fetch(csvUrl)
     .then(response => response.text())
-    .then(data => {
-      const rows = data.split("\n").map(row => row.split(","));
+    .then(csv => {
+      const rows = parseCSV(csv);
       const table = document.getElementById("dashboard");
 
       rows.forEach((row, index) => {
         const tr = document.createElement("tr");
 
+        if (index > 0) {
+          const time = cleanCellText(row[1] || "").toLowerCase();
+
+          if (time === "morning") tr.classList.add("morning");
+          if (time === "evening") tr.classList.add("evening");
+          if (time === "night") tr.classList.add("night");
+        }
+
         row.forEach(cell => {
           const el = document.createElement(index === 0 ? "th" : "td");
-          el.textContent = cell;
+          el.textContent = cleanCellText(cell);
           tr.appendChild(el);
         });
 
