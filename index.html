@@ -173,7 +173,6 @@ function cleanCellText(text) {
   return String(text || "")
     .replaceAll('"', '')
     .replaceAll("Select all days you are available this week? ", "")
-    .replace(/\bPhone-[0-9+\-\s]+/g, "")
     .replace(/,\s*$/g, "")
     .trim();
 }
