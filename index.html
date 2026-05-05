@@ -335,7 +335,10 @@ function renderDashboard() {
     const day = cleanCellText(row[0]);
     const time = cleanCellText(row[1]);
 
-    const rowText = row
+    const rowText = [
+      ...headers,
+      ...row
+    ]
       .map(c => normalizeText(c))
       .join(" ")
       .replace(/\s+/g, " ");
