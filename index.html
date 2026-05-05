@@ -79,17 +79,9 @@
       font-size: 13px;
     }
 
-    .Morning {
-      background: #fff3cd;
-    }
-
-    .Evening {
-      background: #cfe2ff;
-    }
-
-    .Night {
-      background: #e2e3e5;
-    }
+    .Morning { background: #fff3cd; }
+    .Evening { background: #cfe2ff; }
+    .Night { background: #e2e3e5; }
 
     .procedure-grid {
       display: grid;
@@ -118,6 +110,7 @@
       margin: 6px 0;
       border-radius: 6px;
       font-size: 14px;
+      white-space: pre-line;
     }
 
     .empty {
@@ -173,7 +166,15 @@ function cleanCellText(text) {
   return String(text || "")
     .replaceAll('"', '')
     .replaceAll("Select all days you are available this week? ", "")
+    .replace(/\[(.*?)\]/g, "$1")
     .replace(/,\s*$/g, "")
+    .trim();
+}
+
+function normalizeText(text) {
+  return cleanCellText(text)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -231,18 +232,25 @@ function renderDashboard() {
   const dashboard = document.getElementById("dashboard");
   dashboard.innerHTML = "";
 
-  const search = document.getElementById("searchInput").value.toLowerCase();
+  const search = normalizeText(document.getElementById("searchInput").value);
   const selectedDay = document.getElementById("dayFilter").value;
   const selectedTime = document.getElementById("timeFilter").value;
 
   const rows = allRows.filter(row => {
     const day = cleanCellText(row[0]);
     const time = cleanCellText(row[1]);
-    const rowText = row.map(cleanCellText).join(" ").toLowerCase();
+
+    const rowText = row
+      .map(c => normalizeText(c))
+      .join(" ")
+      .replace(/\s+/g, " ");
+
+    const searchWords = search.split(" ").filter(Boolean);
+    const matchesSearch = searchWords.length === 0 || searchWords.every(w => rowText.includes(w));
 
     return (!selectedDay || day === selectedDay) &&
            (!selectedTime || time === selectedTime) &&
-           (!search || rowText.includes(search));
+           matchesSearch;
   });
 
   if (rows.length === 0) {
@@ -282,10 +290,10 @@ function renderDashboard() {
 
       if (doctorsRaw) {
         doctorsRaw.split(/\n/).forEach(doc => {
-          const doctor = document.createElement("div");
-          doctor.className = "doctor";
-          doctor.textContent = doc.trim();
-          procedure.appendChild(doctor);
+          const doctorDiv = document.createElement("div");
+          doctorDiv.className = "doctor";
+          doctorDiv.textContent = doc.trim();
+          procedure.appendChild(doctorDiv);
         });
       } else {
         const empty = document.createElement("div");
@@ -303,7 +311,7 @@ function renderDashboard() {
   });
 }
 
-fetch(csvUrl)
+fetch(csvUrl + "&t=" + Date.now())
   .then(res => res.text())
   .then(csv => {
     const parsed = parseCSV(csv);
