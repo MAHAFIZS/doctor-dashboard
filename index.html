@@ -42,12 +42,41 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
+    .search-box {
+      position: relative;
+    }
+
     input, select {
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 8px;
       font-size: 14px;
       min-width: 180px;
+    }
+
+    .suggestions {
+      position: absolute;
+      top: 42px;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+      z-index: 999;
+    }
+
+    .suggestion-item {
+      padding: 9px 11px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .suggestion-item:hover {
+      background: #f2f6ff;
     }
 
     .container {
@@ -136,7 +165,10 @@
 </header>
 
 <div class="controls">
-  <input type="text" id="searchInput" placeholder="Search doctor or procedure...">
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search doctor or procedure..." autocomplete="off">
+    <div id="suggestions" class="suggestions"></div>
+  </div>
 
   <select id="dayFilter">
     <option value="">All days</option>
@@ -161,6 +193,7 @@ const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxG5LxY8yTO-WQv
 
 let allRows = [];
 let headers = [];
+let suggestionsList = [];
 
 function cleanCellText(text) {
   return String(text || "")
@@ -226,6 +259,68 @@ function populateFilters(rows) {
     option.textContent = day;
     dayFilter.appendChild(option);
   });
+}
+
+function buildSuggestions() {
+  const values = new Set();
+
+  headers.forEach(h => values.add(cleanCellText(h)));
+
+  allRows.forEach(row => {
+    row.forEach(cell => {
+      const text = cleanCellText(cell);
+      if (!text) return;
+
+      text.split(/\n/).forEach(part => {
+        const clean = part.trim();
+        if (clean) values.add(clean);
+      });
+    });
+  });
+
+  ["Morning", "Evening", "Night"].forEach(t => values.add(t));
+
+  suggestionsList = [...values]
+    .filter(v => v && v !== "Day" && v !== "Time")
+    .sort();
+}
+
+function showSuggestions() {
+  const input = document.getElementById("searchInput");
+  const box = document.getElementById("suggestions");
+  const query = normalizeText(input.value);
+
+  box.innerHTML = "";
+
+  if (!query) {
+    box.style.display = "none";
+    return;
+  }
+
+  const matches = suggestionsList
+    .filter(item => normalizeText(item).includes(query) || normalizeText(item).split(" ").some(w => w.startsWith(query)))
+    .slice(0, 10);
+
+  if (matches.length === 0) {
+    box.style.display = "none";
+    return;
+  }
+
+  matches.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "suggestion-item";
+    div.textContent = item;
+
+    div.addEventListener("click", () => {
+      input.value = item;
+      box.style.display = "none";
+      renderDashboard();
+    });
+
+    box.appendChild(div);
+  });
+
+  box.style.display = "block";
 }
 
 function renderDashboard() {
@@ -321,11 +416,22 @@ fetch(csvUrl + "&t=" + Date.now())
     allRows = parsed.slice(1).filter(r => r.length > 1);
 
     populateFilters(allRows);
+    buildSuggestions();
     renderDashboard();
 
-    document.getElementById("searchInput").addEventListener("input", renderDashboard);
+    document.getElementById("searchInput").addEventListener("input", () => {
+      showSuggestions();
+      renderDashboard();
+    });
+
     document.getElementById("dayFilter").addEventListener("change", renderDashboard);
     document.getElementById("timeFilter").addEventListener("change", renderDashboard);
+
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".search-box")) {
+        document.getElementById("suggestions").style.display = "none";
+      }
+    });
   });
 </script>
 
