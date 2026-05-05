@@ -245,8 +245,10 @@ function renderDashboard() {
       .join(" ")
       .replace(/\s+/g, " ");
 
-    const searchWords = search.split(" ").filter(Boolean);
-    const matchesSearch = searchWords.length === 0 || searchWords.every(w => rowText.includes(w));
+    const matchesSearch =
+      !search ||
+      rowText.includes(search) ||
+      rowText.split(" ").some(word => word.startsWith(search));
 
     return (!selectedDay || day === selectedDay) &&
            (!selectedTime || time === selectedTime) &&
