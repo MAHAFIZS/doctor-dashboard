@@ -1,139 +1,323 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Doctor Availability Dashboard</title>
+  <title>Hospital Doctor Availability</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f5f7fa;
+      margin: 0;
+      background: #eef3f8;
+      color: #222;
     }
 
-    h1 {
+    header {
+      background: linear-gradient(135deg, #0b5ed7, #198754);
+      color: white;
+      padding: 28px 20px;
       text-align: center;
-      margin-bottom: 25px;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    header h1 {
+      margin: 0;
+      font-size: 30px;
+    }
+
+    header p {
+      margin: 8px 0 0;
+      font-size: 15px;
+      opacity: 0.95;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 18px;
       background: white;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    input, select {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 180px;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 14px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 14px 18px;
+      font-weight: bold;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .time {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+
+    .Morning {
+      background: #fff3cd;
+    }
+
+    .Evening {
+      background: #cfe2ff;
+    }
+
+    .Night {
+      background: #e2e3e5;
+    }
+
+    .procedure-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      padding: 15px;
+    }
+
+    .procedure {
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 12px;
+      background: #fafafa;
+    }
+
+    .procedure-title {
+      font-weight: bold;
+      color: #0b5ed7;
+      margin-bottom: 8px;
+    }
+
+    .doctor {
+      background: #eaf7ef;
+      border-left: 4px solid #198754;
+      padding: 7px 9px;
+      margin: 6px 0;
+      border-radius: 6px;
       font-size: 14px;
     }
 
-    th, td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      vertical-align: top;
-      white-space: pre-line;
+    .empty {
+      color: #999;
+      font-size: 13px;
+      font-style: italic;
     }
 
-    th {
-      background: #2c7be5;
-      color: white;
+    .footer {
       text-align: center;
-    }
-
-    tr:nth-child(even) {
-      background: #f2f6ff;
-    }
-
-    .morning {
-      background: #fff9c4;
-    }
-
-    .evening {
-      background: #bbdefb;
-    }
-
-    .night {
-      background: #e0e0e0;
+      padding: 15px;
+      color: #666;
+      font-size: 13px;
     }
   </style>
 </head>
 
 <body>
 
-<h1>Doctor Availability Dashboard</h1>
+<header>
+  <h1>🏥 Doctor Availability Dashboard 👨‍⚕️</h1>
+  <p>Live procedure availability by date, time, and procedure</p>
+</header>
 
-<table id="dashboard"></table>
+<div class="controls">
+  <input type="text" id="searchInput" placeholder="Search doctor or procedure...">
+
+  <select id="dayFilter">
+    <option value="">All days</option>
+  </select>
+
+  <select id="timeFilter">
+    <option value="">All times</option>
+    <option value="Morning">Morning</option>
+    <option value="Evening">Evening</option>
+    <option value="Night">Night</option>
+  </select>
+</div>
+
+<div class="container" id="dashboard"></div>
+
+<div class="footer">
+  Auto-updated from Google Sheets
+</div>
 
 <script>
-  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxG5LxY8yTO-WQvgxga47qIE_3JQYcuiRyo1wTskMcDRfiSVsKCZ1KPjQoHFmO4uTHbMettWKlyj1_/pub?gid=1707988883&single=true&output=csv";
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxG5LxY8yTO-WQvgxga47qIE_3JQYcuiRyo1wTskMcDRfiSVsKCZ1KPjQoHFmO4uTHbMettWKlyj1_/pub?gid=1707988883&single=true&output=csv";
 
-  function cleanCellText(text) {
-    return text
-      .replaceAll('"', '')
-      .replaceAll("Select all days you are available this week? ", "")
-      .replace(/\bPhone-[0-9+\-\s]+/g, "")
-      .replace(/,\s*$/g, "")
-      .trim();
-  }
+let allRows = [];
+let headers = [];
 
-  function parseCSV(csv) {
-    const rows = [];
-    let currentRow = [];
-    let currentCell = "";
-    let insideQuotes = false;
+function cleanCellText(text) {
+  return String(text || "")
+    .replaceAll('"', '')
+    .replaceAll("Select all days you are available this week? ", "")
+    .replace(/\bPhone-[0-9+\-\s]+/g, "")
+    .replace(/,\s*$/g, "")
+    .trim();
+}
 
-    for (let i = 0; i < csv.length; i++) {
-      const char = csv[i];
-      const nextChar = csv[i + 1];
+function parseCSV(csv) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let insideQuotes = false;
 
-      if (char === '"' && nextChar === '"') {
-        currentCell += '"';
-        i++;
-      } else if (char === '"') {
-        insideQuotes = !insideQuotes;
-      } else if (char === "," && !insideQuotes) {
-        currentRow.push(currentCell);
-        currentCell = "";
-      } else if ((char === "\n" || char === "\r") && !insideQuotes) {
-        if (currentCell || currentRow.length > 0) {
-          currentRow.push(currentCell);
-          rows.push(currentRow);
-          currentRow = [];
-          currentCell = "";
-        }
-      } else {
-        currentCell += char;
+  for (let i = 0; i < csv.length; i++) {
+    const char = csv[i];
+    const next = csv[i + 1];
+
+    if (char === '"' && next === '"') {
+      cell += '"';
+      i++;
+    } else if (char === '"') {
+      insideQuotes = !insideQuotes;
+    } else if (char === "," && !insideQuotes) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !insideQuotes) {
+      if (cell || row.length) {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = "";
       }
+    } else {
+      cell += char;
     }
-
-    if (currentCell || currentRow.length > 0) {
-      currentRow.push(currentCell);
-      rows.push(currentRow);
-    }
-
-    return rows;
   }
 
-  fetch(csvUrl)
-    .then(response => response.text())
-    .then(csv => {
-      const rows = parseCSV(csv);
-      const table = document.getElementById("dashboard");
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
 
-      rows.forEach((row, index) => {
-        const tr = document.createElement("tr");
+  return rows;
+}
 
-        if (index > 0) {
-          const time = cleanCellText(row[1] || "").toLowerCase();
+function populateFilters(rows) {
+  const dayFilter = document.getElementById("dayFilter");
+  const days = [...new Set(rows.map(r => cleanCellText(r[0])).filter(Boolean))];
 
-          if (time === "morning") tr.classList.add("morning");
-          if (time === "evening") tr.classList.add("evening");
-          if (time === "night") tr.classList.add("night");
-        }
+  days.forEach(day => {
+    const option = document.createElement("option");
+    option.value = day;
+    option.textContent = day;
+    dayFilter.appendChild(option);
+  });
+}
 
-        row.forEach(cell => {
-          const el = document.createElement(index === 0 ? "th" : "td");
-          el.textContent = cleanCellText(cell);
-          tr.appendChild(el);
+function renderDashboard() {
+  const dashboard = document.getElementById("dashboard");
+  dashboard.innerHTML = "";
+
+  const search = document.getElementById("searchInput").value.toLowerCase();
+  const selectedDay = document.getElementById("dayFilter").value;
+  const selectedTime = document.getElementById("timeFilter").value;
+
+  const rows = allRows.filter(row => {
+    const day = cleanCellText(row[0]);
+    const time = cleanCellText(row[1]);
+    const rowText = row.map(cleanCellText).join(" ").toLowerCase();
+
+    return (!selectedDay || day === selectedDay) &&
+           (!selectedTime || time === selectedTime) &&
+           (!search || rowText.includes(search));
+  });
+
+  if (rows.length === 0) {
+    dashboard.innerHTML = "<p>No availability found.</p>";
+    return;
+  }
+
+  rows.forEach(row => {
+    const day = cleanCellText(row[0]);
+    const time = cleanCellText(row[1]);
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const cardHeader = document.createElement("div");
+    cardHeader.className = "card-header";
+    cardHeader.innerHTML = `
+      <span>📅 ${day}</span>
+      <span class="time ${time}">🕒 ${time}</span>
+    `;
+
+    const grid = document.createElement("div");
+    grid.className = "procedure-grid";
+
+    for (let i = 2; i < headers.length; i++) {
+      const procedureName = cleanCellText(headers[i]);
+      const doctorsRaw = cleanCellText(row[i]);
+
+      const procedure = document.createElement("div");
+      procedure.className = "procedure";
+
+      const title = document.createElement("div");
+      title.className = "procedure-title";
+      title.textContent = procedureName;
+
+      procedure.appendChild(title);
+
+      if (doctorsRaw) {
+        doctorsRaw.split(/\n/).forEach(doc => {
+          const doctor = document.createElement("div");
+          doctor.className = "doctor";
+          doctor.textContent = doc.trim();
+          procedure.appendChild(doctor);
         });
+      } else {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No doctor available";
+        procedure.appendChild(empty);
+      }
 
-        table.appendChild(tr);
-      });
-    });
+      grid.appendChild(procedure);
+    }
+
+    card.appendChild(cardHeader);
+    card.appendChild(grid);
+    dashboard.appendChild(card);
+  });
+}
+
+fetch(csvUrl)
+  .then(res => res.text())
+  .then(csv => {
+    const parsed = parseCSV(csv);
+    headers = parsed[0].map(cleanCellText);
+    allRows = parsed.slice(1).filter(r => r.length > 1);
+
+    populateFilters(allRows);
+    renderDashboard();
+
+    document.getElementById("searchInput").addEventListener("input", renderDashboard);
+    document.getElementById("dayFilter").addEventListener("change", renderDashboard);
+    document.getElementById("timeFilter").addEventListener("change", renderDashboard);
+  });
 </script>
 
 </body>
