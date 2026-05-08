@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Doctor Availability</title>
+  <title>Hospital Procedure Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -51,7 +51,7 @@
       border: 1px solid #ccc;
       border-radius: 8px;
       font-size: 14px;
-      min-width: 180px;
+      min-width: 200px;
     }
 
     .suggestions {
@@ -102,44 +102,54 @@
       flex-wrap: wrap;
     }
 
-    .time {
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 13px;
+    .procedure-name {
+      color: #0b5ed7;
+      font-weight: bold;
     }
 
-    .Morning { background: #fff3cd; }
-    .Evening { background: #cfe2ff; }
-    .Night { background: #e2e3e5; }
-
-    .procedure-grid {
+    .status-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 12px;
       padding: 15px;
     }
 
-    .procedure {
+    .status-box {
       border: 1px solid #e0e0e0;
       border-radius: 10px;
       padding: 12px;
       background: #fafafa;
+      min-height: 80px;
     }
 
-    .procedure-title {
+    .status-title {
       font-weight: bold;
-      color: #0b5ed7;
       margin-bottom: 8px;
     }
 
+    .observe {
+      background: #e3f2fd;
+      border-left: 5px solid #2196f3;
+    }
+
+    .supervised {
+      background: #fff3e0;
+      border-left: 5px solid #fb8c00;
+    }
+
+    .unsupervised {
+      background: #e8f5e9;
+      border-left: 5px solid #43a047;
+    }
+
     .doctor {
-      background: #eaf7ef;
-      border-left: 4px solid #198754;
+      background: white;
       padding: 7px 9px;
       margin: 6px 0;
       border-radius: 6px;
       font-size: 14px;
       white-space: pre-line;
+      border: 1px solid #e0e0e0;
     }
 
     .empty {
@@ -160,13 +170,13 @@
 <body>
 
 <header>
-  <h1>🏥 Doctor Availability Dashboard 👨‍⚕️</h1>
-  <p>Live procedure availability by date, time, and procedure</p>
+  <h1>🏥 Procedure Interest Dashboard 👨‍⚕️</h1>
+  <p>Live procedure interest by date, procedure, and participation level</p>
 </header>
 
 <div class="controls">
   <div class="search-box">
-    <input type="text" id="searchInput" placeholder="Search doctor or procedure..." autocomplete="off">
+    <input type="text" id="searchInput" placeholder="Search doctor, procedure, status..." autocomplete="off">
     <div id="suggestions" class="suggestions"></div>
   </div>
 
@@ -174,11 +184,11 @@
     <option value="">All days</option>
   </select>
 
-  <select id="timeFilter">
-    <option value="">All times</option>
-    <option value="Morning">Morning</option>
-    <option value="Evening">Evening</option>
-    <option value="Night">Night</option>
+  <select id="statusFilter">
+    <option value="">All statuses</option>
+    <option value="Observe">Observe</option>
+    <option value="Do under supervision">Do under supervision</option>
+    <option value="Unsupervised">Unsupervised</option>
   </select>
 </div>
 
@@ -198,7 +208,6 @@ let suggestionsList = [];
 function cleanCellText(text) {
   return String(text || "")
     .replaceAll('"', '')
-    .replaceAll("Select all days you are available this week? ", "")
     .replace(/\[(.*?)\]/g, "$1")
     .replace(/,\s*$/g, "")
     .trim();
@@ -251,6 +260,8 @@ function parseCSV(csv) {
 
 function populateFilters(rows) {
   const dayFilter = document.getElementById("dayFilter");
+  dayFilter.innerHTML = `<option value="">All days</option>`;
+
   const days = [...new Set(rows.map(r => cleanCellText(r[0])).filter(Boolean))];
 
   days.forEach(day => {
@@ -278,10 +289,8 @@ function buildSuggestions() {
     });
   });
 
-  ["Morning", "Evening", "Night"].forEach(t => values.add(t));
-
   suggestionsList = [...values]
-    .filter(v => v && v !== "Day" && v !== "Time")
+    .filter(v => v && v !== "Day")
     .sort();
 }
 
@@ -298,7 +307,10 @@ function showSuggestions() {
   }
 
   const matches = suggestionsList
-    .filter(item => normalizeText(item).includes(query) || normalizeText(item).split(" ").some(w => w.startsWith(query)))
+    .filter(item => {
+      const n = normalizeText(item);
+      return n.includes(query) || n.split(" ").some(w => w.startsWith(query));
+    })
     .slice(0, 10);
 
   if (matches.length === 0) {
@@ -329,11 +341,10 @@ function renderDashboard() {
 
   const search = normalizeText(document.getElementById("searchInput").value);
   const selectedDay = document.getElementById("dayFilter").value;
-  const selectedTime = document.getElementById("timeFilter").value;
+  const selectedStatus = document.getElementById("statusFilter").value;
 
   const rows = allRows.filter(row => {
     const day = cleanCellText(row[0]);
-    const time = cleanCellText(row[1]);
 
     const rowText = [
       ...headers,
@@ -348,8 +359,12 @@ function renderDashboard() {
       rowText.includes(search) ||
       rowText.split(" ").some(word => word.startsWith(search));
 
+    const matchesStatus =
+      !selectedStatus ||
+      cleanCellText(row[headers.indexOf(selectedStatus)]) !== "";
+
     return (!selectedDay || day === selectedDay) &&
-           (!selectedTime || time === selectedTime) &&
+           matchesStatus &&
            matchesSearch;
   });
 
@@ -360,7 +375,7 @@ function renderDashboard() {
 
   rows.forEach(row => {
     const day = cleanCellText(row[0]);
-    const time = cleanCellText(row[1]);
+    const procedure = cleanCellText(row[1]);
 
     const card = document.createElement("div");
     card.className = "card";
@@ -369,41 +384,47 @@ function renderDashboard() {
     cardHeader.className = "card-header";
     cardHeader.innerHTML = `
       <span>📅 ${day}</span>
-      <span class="time ${time}">🕒 ${time}</span>
+      <span class="procedure-name">🩺 ${procedure}</span>
     `;
 
     const grid = document.createElement("div");
-    grid.className = "procedure-grid";
+    grid.className = "status-grid";
 
-    for (let i = 2; i < headers.length; i++) {
-      const procedureName = cleanCellText(headers[i]);
-      const doctorsRaw = cleanCellText(row[i]);
+    const statusColumns = [
+      { name: "Observe", className: "observe", icon: "👀" },
+      { name: "Do under supervision", className: "supervised", icon: "🧑‍🏫" },
+      { name: "Unsupervised", className: "unsupervised", icon: "✅" }
+    ];
 
-      const procedure = document.createElement("div");
-      procedure.className = "procedure";
+    statusColumns.forEach(status => {
+      const colIndex = headers.indexOf(status.name);
+      const doctorsRaw = colIndex >= 0 ? cleanCellText(row[colIndex]) : "";
+
+      const box = document.createElement("div");
+      box.className = `status-box ${status.className}`;
 
       const title = document.createElement("div");
-      title.className = "procedure-title";
-      title.textContent = procedureName;
+      title.className = "status-title";
+      title.textContent = `${status.icon} ${status.name}`;
 
-      procedure.appendChild(title);
+      box.appendChild(title);
 
       if (doctorsRaw) {
         doctorsRaw.split(/\n/).forEach(doc => {
           const doctorDiv = document.createElement("div");
           doctorDiv.className = "doctor";
           doctorDiv.textContent = doc.trim();
-          procedure.appendChild(doctorDiv);
+          box.appendChild(doctorDiv);
         });
       } else {
         const empty = document.createElement("div");
         empty.className = "empty";
-        empty.textContent = "No doctor available";
-        procedure.appendChild(empty);
+        empty.textContent = "No doctor listed";
+        box.appendChild(empty);
       }
 
-      grid.appendChild(procedure);
-    }
+      grid.appendChild(box);
+    });
 
     card.appendChild(cardHeader);
     card.appendChild(grid);
@@ -428,7 +449,7 @@ fetch(csvUrl + "&t=" + Date.now())
     });
 
     document.getElementById("dayFilter").addEventListener("change", renderDashboard);
-    document.getElementById("timeFilter").addEventListener("change", renderDashboard);
+    document.getElementById("statusFilter").addEventListener("change", renderDashboard);
 
     document.addEventListener("click", e => {
       if (!e.target.closest(".search-box")) {
