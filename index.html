@@ -46,12 +46,34 @@
       position: relative;
     }
 
-    input, select {
+    input, select, button {
       padding: 10px;
-      border: 1px solid #ccc;
       border-radius: 8px;
       font-size: 14px;
-      min-width: 200px;
+      min-width: 160px;
+    }
+
+    input, select {
+      border: 1px solid #ccc;
+    }
+
+    button {
+      border: none;
+      background: #198754;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #146c43;
+    }
+
+    .clear-btn {
+      background: #6c757d;
+    }
+
+    .clear-btn:hover {
+      background: #5c636a;
     }
 
     .suggestions {
@@ -190,6 +212,9 @@
     <option value="Do under supervision">Do under supervision</option>
     <option value="Unsupervised">Unsupervised</option>
   </select>
+
+  <button id="todayBtn">📅 Today</button>
+  <button id="clearBtn" class="clear-btn">Clear</button>
 </div>
 
 <div class="container" id="dashboard"></div>
@@ -335,6 +360,17 @@ function showSuggestions() {
   box.style.display = "block";
 }
 
+function getTodayDateText() {
+  const today = new Date();
+
+  const weekday = today.toLocaleDateString("en-US", { weekday: "long" });
+  const day = today.getDate();
+  const month = today.toLocaleDateString("en-US", { month: "long" });
+  const year = today.getFullYear();
+
+  return `${weekday} (${day} ${month} ${year})`;
+}
+
 function renderDashboard() {
   const dashboard = document.getElementById("dashboard");
   dashboard.innerHTML = "";
@@ -450,6 +486,20 @@ fetch(csvUrl + "&t=" + Date.now())
 
     document.getElementById("dayFilter").addEventListener("change", renderDashboard);
     document.getElementById("statusFilter").addEventListener("change", renderDashboard);
+
+    document.getElementById("todayBtn").addEventListener("click", () => {
+      const todayText = getTodayDateText();
+      document.getElementById("dayFilter").value = todayText;
+      renderDashboard();
+    });
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      document.getElementById("searchInput").value = "";
+      document.getElementById("dayFilter").value = "";
+      document.getElementById("statusFilter").value = "";
+      document.getElementById("suggestions").style.display = "none";
+      renderDashboard();
+    });
 
     document.addEventListener("click", e => {
       if (!e.target.closest(".search-box")) {
